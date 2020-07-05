@@ -14,12 +14,12 @@ def load_json(path):
   return out
 
 path_transit_database = "tokyo-transit.db"
-path_attractions = "attractions.json"
+path_events = "events.json"
 
 conn = sqlite3.connect(path_transit_database)
 c = conn.cursor()
 
-attractions = load_json(path_attractions)
+event_list = load_json(path_events)
 
 route_request_template = '''
   SELECT from_id,
@@ -55,107 +55,164 @@ def request_translation(station):
   else:
     return None
 
-def request_route(from_station, to_station, first=True):
-  request = route_request_template.format(from_station, to_station)
-  c.execute(request)
-  res = c.fetchone()
-  if res is not None:
-    return {
-      'from_station': res[0],
-      'to_station': res[1],
-      'minutes': res[2],
-      'yen': res[3],
-      'transfers': res[4]
-    }
-  else:
-    if first:
-        return request_route(to_station, from_station, False)
+def cost_string(cost):
+    return "free" if cost == 0 else "¥‎{}".format(cost)
+
+def duration_string(duration):
+    hours, remainder = divmod(duration.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        if minutes > 0:
+            return "{}h {}m".format(hours, minutes)
+        else:
+            return "{}h".format(hours)
     else:
-        return None
+        return "{}m".format(minutes)
 
-combs = []
+class Event(object):
+    def __init__(self, name, station, duration, cost=0, tags=[]):
+        self.name = name
+        self.station = station
+        if type(duration) is float or type(duration) is int:
+            self.duration = datetime.timedelta(hours=duration)
+        else:
+            self.duration = duration
+        self.cost = cost
+        self.tags = [tags]
 
-for i in range(1, len(attractions)+1):
-    els = [list(x) for x in itertools.combinations(attractions, i)]
-    combs.extend(els)
+    def __str__(self):
+        return "{}, {} Station, {} Yen, {}, {}".format(self.name,
+            self.station,
+            self.duration,
+            self.cost,
+            self.tags)
 
-valid_tours = []
+class Route(object):
+    def __init__(self, from_station, to_station):
+        self.from_station = from_station
+        self.to_station = to_station
+        self.duration = None
+        self.cost = None
+        self.calculate()
 
-cost_max = 100000
+    def calculate(self, reverse=False):
+        stations = [self.from_station, self.to_station]
+        if reverse:
+            stations.reverse()
+        request = route_request_template.format(*stations)
+        c.execute(request)
+        res = c.fetchone()
+        if res is None:
+            if reverse is False:
+                return self.calculate(reverse=True)
+            else:
+                print("Cant find stations {} to {}".format(self.from_station, self.to_station))
+                raise
+        else:
+            self.duration = datetime.timedelta(minutes=res[2])
+            self.cost = res[3]
+
+class Requirements(object):
+    def __init__(self, max_cost, max_duration):
+        self.max_cost = max_cost
+        self.max_duration = max_duration
+
+class Tour(object):
+    def __init__(self, start_time):
+        self.start_time = start_time
+        self.cost = 0
+        self.duration = datetime.timedelta()
+        self.tags = []
+        self.events = []
+        self.routes = []
+
+    def add_event(self, event):
+        self.events.append(event)
+        self.cost += event.cost
+        self.duration += event.duration
+
+    def add_events(self, events):
+        for event in events:
+            self.add_event(event)
+
+    def add_route(self, route):
+        self.cost += route.cost
+        self.duration += route.duration
+        self.routes.append(route)
+
+    def calculate_routes(self):
+        if len(self.events) > 1:
+            stations = [x.station for x in self.events]
+            for index in range(len(stations) - 1):
+                self.add_route(Route(stations[index], stations[index+1]))
+
+    def print_itineary(self):
+        print(" - Total cost: {}".format(cost_string(self.cost)))
+        print(" - Total time: {}".format(duration_string(self.duration)))
+        print(" - Itineary:")
+        clock = self.start_time
+        num_events = len(self.events)
+        verb = "Meet"
+        for index in range(num_events):
+            event = self.events[index]
+            print("    - {}: {} at {} Station".format(clock.strftime("%H:%M"), verb, event.station))
+            verb = "Arrive"
+            print("             {} ({}, {})".format(event.name, duration_string(event.duration), cost_string(event.cost)))
+            clock += event.duration
+            if index < len(self.routes):
+                route = self.routes[index]
+                print("    - {}: Train from {} Station to {} Station ({} mins, {})".format(
+                    clock.strftime("%H:%M"),
+                    route.from_station,
+                    route.to_station,
+                    duration_string(route.duration),
+                    cost_string(route.cost)))
+                clock += route.duration
+        print("    - {}: Finish tour at {} Station".format(clock.strftime("%H:%M"), self.events[-1].station))
+
+def tour_is_acceptable(tour, requirements):
+    if tour.cost > requirements.max_cost:
+        return False
+    elif tour.duration > requirements.max_duration:
+        return False
+    else:
+        return True
+
+def check_tour_acceptable(tour, requirements):
+    """ Optimisation to avoid calculating routes if not necessary"""
+    if tour_is_acceptable(tour, requirements):
+        tour.calculate_routes()
+        return tour_is_acceptable(tour, requirements)
+    return False
+
+def generate_event_combinations(event_list):
+    combos = []
+    for i in range(1, len(event_list)+1):
+        els = [list(x) for x in itertools.combinations(event_list, i)]
+        combos.extend(els)
+    return combos
+
+max_cost = 100000
 tour_start = datetime.datetime(2020, 7, 4, 8, 0)
 tour_end = datetime.datetime(2020, 7, 4, 17, 0)
+max_duration = tour_end - tour_start
+requirements = Requirements(max_cost, max_duration)
 
-duration_limit = tour_end - tour_start
+valid_tours = []
+for event_combination in generate_event_combinations(event_list):
+    valid_permutations = []
+    for event_permutation in itertools.permutations(event_combination):
+        tour = Tour(tour_start)
+        tour.add_events([Event(*x) for x in event_permutation])
+        if check_tour_acceptable(tour, requirements):
+            valid_permutations.append(tour)
 
-def tour_is_acceptable(meta):
-    if meta['total_cost'] > cost_max:
-        return False
-    if meta['duration'] > duration_limit:
-        return False
-    return True
-
-
-for combo in combs:
-    tours = itertools.permutations(combo)
-    valid_tours_temp = []
-    for tour in tours:
-        meta = {
-            'total_cost': 0,
-            'duration': datetime.timedelta(),
-            'tags': []
-        }
-        for attraction in tour:
-            meta['total_cost'] += attraction[3]
-            meta['duration'] += datetime.timedelta(hours=attraction[2])
-            meta['tags'].append(attraction[4])
-
-        if tour_is_acceptable(meta):
-            train_rides = []
-            if len(tour) > 1:
-                stations = [x[1] for x in tour]
-                for index in range(len(stations) - 1):
-                    from_station = tour[index][1]
-                    to_station = tour[index+1][1]
-                    route = request_route(from_station, to_station)
-                    train_rides.append(route)
-                for train_ride in train_rides:
-                    meta['total_cost'] += train_ride['yen']
-                    meta['duration'] += datetime.timedelta(minutes=train_ride['minutes'])
-
-            if tour_is_acceptable(meta):
-                valid_tours_temp.append({
-                    'meta': meta,
-                    'train_rides': train_rides,
-                    'attractions': tour
-                })
-
-    # Filter sub_optimal combinations
-    times = [x['meta']['duration'] for x in valid_tours_temp]
-    print(valid_tours_temp)
-    if len(times) > 0:
-        min_time = min(times)
-        for valid_tour in valid_tours_temp:
-            if valid_tour['meta']['duration'] == min_time:
-                valid_tours.append(valid_tour)
-
+    durations = [tour.duration for tour in valid_permutations]
+    if len(durations) != 0:
+        min_duration = min(durations)
+        valid_tours += [tour for tour in valid_permutations if tour.duration == min_duration]
 
 for i, tour in enumerate(valid_tours):
     print("Tour {}".format(i))
-    print(" - Total cost:     {} Yen".format(tour['meta']['total_cost']))
-    print(" - Total duration: {}".format(tour['meta']['duration']))
-    print(" - Itineary:")
-    temp_time = tour_start
-    num_attractions = len(tour['attractions'])
-    verb = "Meet"
-    for index in range(num_attractions):
-        attraction = tour['attractions'][index]
-        print("    - {}: {} at {} Station".format(temp_time.strftime("%H:%M"), verb, attraction[1]))
-        verb = "Arrive"
-        print("             {} ({} hours, {} Yen)".format(attraction[0], attraction[2], attraction[3]))
-        temp_time += datetime.timedelta(hours=attraction[2])
-        if num_attractions > 1 and index < len(tour['train_rides']):
-            route = tour['train_rides'][index]
-            print("    - {}: Catch train from {} Station to {} Station ({} mins, {} Yen)".format(temp_time.strftime("%H:%M"), tour['attractions'][index][1], tour['attractions'][index+1][1], route['minutes'], route['yen']))
-            temp_time += datetime.timedelta(minutes=route['minutes'])
-    print("    - {}: Finish tour at {} Station".format(temp_time.strftime("%H:%M"), attraction[1]))
+    tour.print_itineary()
     print("")
