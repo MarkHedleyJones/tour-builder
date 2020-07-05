@@ -19,8 +19,6 @@ path_events = "events.json"
 conn = sqlite3.connect(path_transit_database)
 c = conn.cursor()
 
-event_list = load_json(path_events)
-
 route_request_template = '''
   SELECT from_id,
          to_id,
@@ -28,16 +26,8 @@ route_request_template = '''
          cost,
          transfers
   FROM routes
-  WHERE from_id = (
-    SELECT station_id
-    FROM stations
-    WHERE english = "{}"
-  )
-  AND to_id = (
-    SELECT station_id
-    FROM stations
-    WHERE english = "{}"
-  );
+  WHERE from_id = "{}"
+  AND to_id = "{}";
 '''
 
 translation_request_template = '''
@@ -46,12 +36,12 @@ translation_request_template = '''
     WHERE english = "{}"
 '''
 
-def request_translation(station):
-  request = translation_request_template.format(station)
+def get_station_id(station_name):
+  request = translation_request_template.format(station_name)
   c.execute(request)
   res = c.fetchone()
   if res is not None:
-    return res[0]
+    return int(res[0])
   else:
     return None
 
@@ -73,6 +63,7 @@ class Event(object):
     def __init__(self, name, station, duration, cost=0, tags=[]):
         self.name = name
         self.station = station
+        self.station_id = get_station_id(station)
         if type(duration) is float or type(duration) is int:
             self.duration = datetime.timedelta(hours=duration)
         else:
@@ -88,15 +79,15 @@ class Event(object):
             self.tags)
 
 class Route(object):
-    def __init__(self, from_station, to_station):
-        self.from_station = from_station
-        self.to_station = to_station
+    def __init__(self, from_station_id, to_station_id):
+        self.from_station_id = from_station_id
+        self.to_station_id = to_station_id
         self.duration = None
         self.cost = None
         self.calculate()
 
     def calculate(self, reverse=False):
-        stations = [self.from_station, self.to_station]
+        stations = [self.from_station_id, self.to_station_id]
         if reverse:
             stations.reverse()
         request = route_request_template.format(*stations)
@@ -106,7 +97,7 @@ class Route(object):
             if reverse is False:
                 return self.calculate(reverse=True)
             else:
-                print("Cant find stations {} to {}".format(self.from_station, self.to_station))
+                print("Cant find link between stations")
                 raise
         else:
             self.duration = datetime.timedelta(minutes=res[2])
@@ -142,9 +133,10 @@ class Tour(object):
 
     def calculate_routes(self):
         if len(self.events) > 1:
-            stations = [x.station for x in self.events]
-            for index in range(len(stations) - 1):
-                self.add_route(Route(stations[index], stations[index+1]))
+            station_ids = [x.station_id for x in self.events]
+            for index in range(len(station_ids) - 1):
+                self.add_route(Route(self.events[index].station_id,
+                                     self.events[index+1].station_id))
 
     def print_itineary(self):
         print(" - Total cost: {}".format(cost_string(self.cost)))
@@ -155,20 +147,22 @@ class Tour(object):
         verb = "Meet"
         for index in range(num_events):
             event = self.events[index]
-            print("    - {}: {} at {} Station".format(clock.strftime("%H:%M"), verb, event.station))
+            print("     {}: {} at {} Station".format(clock.strftime("%H:%M"), verb, event.station))
             verb = "Arrive"
-            print("             {} ({}, {})".format(event.name, duration_string(event.duration), cost_string(event.cost)))
+            print("            {} ({}, {})".format(event.name, duration_string(event.duration), cost_string(event.cost)))
+            print("")
             clock += event.duration
             if index < len(self.routes):
                 route = self.routes[index]
-                print("    - {}: Train from {} Station to {} Station ({} mins, {})".format(
+                print("     {}: Train from {} Station to {} Station ({} mins, {})".format(
                     clock.strftime("%H:%M"),
-                    route.from_station,
-                    route.to_station,
+                    event.station,
+                    self.events[index + 1].station,
                     duration_string(route.duration),
                     cost_string(route.cost)))
                 clock += route.duration
-        print("    - {}: Finish tour at {} Station".format(clock.strftime("%H:%M"), self.events[-1].station))
+                print("")
+        print("     {}: Finish tour at {} Station".format(clock.strftime("%H:%M"), self.events[-1].station))
 
 def tour_is_acceptable(tour, requirements):
     if tour.cost > requirements.max_cost:
@@ -192,18 +186,26 @@ def generate_event_combinations(event_list):
         combos.extend(els)
     return combos
 
+def load_events(path_events):
+    event_list = load_json(path_events)
+    events = [Event(*event) for event in event_list]
+    return events
+
+
 max_cost = 100000
 tour_start = datetime.datetime(2020, 7, 4, 8, 0)
 tour_end = datetime.datetime(2020, 7, 4, 17, 0)
 max_duration = tour_end - tour_start
 requirements = Requirements(max_cost, max_duration)
 
+events = load_events(path_events)
 valid_tours = []
-for event_combination in generate_event_combinations(event_list):
+
+for event_combination in generate_event_combinations(events):
     valid_permutations = []
-    for event_permutation in itertools.permutations(event_combination):
+    for event_permutations in itertools.permutations(event_combination):
         tour = Tour(tour_start)
-        tour.add_events([Event(*x) for x in event_permutation])
+        tour.add_events(event_permutations)
         if check_tour_acceptable(tour, requirements):
             valid_permutations.append(tour)
 
