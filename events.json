@@ -1,9 +1,0 @@
-[
-  ["Asakusa Temple", "Asakusa", 3.0, 0, "Temple"],
-  ["Meiji Jingu Shrine", "Harajuku", 1.5, 0, "Temple"],
-  ["My favourite restaurant", "Meguro", 2.0, 50000, "Restaurant"],
-  ["Little Nap Cafe", "Yoyogi-koen", 1.0, 1500, "Cafe"],
-  ["Skytree", "Tokyo Skytree", 1.0, 3400, "Building"],
-  ["Emperial Palace", "Hibiya", 3.0, 0, "Historical"],
-  ["Government Buildings", "Shinjuku", 2.5, 0, "Building"]
-]

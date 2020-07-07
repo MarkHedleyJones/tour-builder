@@ -1,10 +1,12 @@
 #!/usr/bin/python3
 
-import sqlite3
+import csv
+import datetime
 import itertools
 import json
 import os
-import datetime
+import sqlite3
+import time
 
 
 def load_json(path):
@@ -14,8 +16,9 @@ def load_json(path):
             out = json.load(f)
     return out
 
+
 path_transit_database = "tokyo-transit.db"
-path_events = "events.json"
+path_events = "events.csv"
 
 conn = sqlite3.connect(path_transit_database)
 c = conn.cursor()
@@ -66,23 +69,72 @@ def duration_string(duration):
 
 class Event(object):
 
-    def __init__(self, name, station, duration, cost=0, tags=[]):
+    def __init__(self, name, station, duration, cost, opens, closes, category, description):
         self.name = name
         self.station = station
         self.station_id = get_station_id(station)
         if type(duration) is float or type(duration) is int:
             self.duration = datetime.timedelta(hours=duration)
+        elif type(duration) is str:
+            self.duration = datetime.timedelta(hours=float(duration))
         else:
             self.duration = duration
-        self.cost = cost
-        self.tags = [tags]
+        self.cost = int(cost)
+        self.opens = time.strftime(opens)
+        self.closes = time.strftime(closes)
+        self.category = category
+        self.description = description
 
     def __str__(self):
         return "{}, {} Station, {} Yen, {}, {}".format(self.name,
                                                        self.station,
                                                        self.duration,
                                                        self.cost,
-                                                       self.tags)
+                                                       self.opens,
+                                                       self.closes,
+                                                       self.category,
+                                                       self.description)
+
+
+class EventFactory(object):
+
+    def build_from_csv(self, csv_path):
+        keys = {
+            "Place Name": "name",
+            "Train Station": "station",
+            "Time at Place (hours)": "duration",
+            "Cost (per person)": "cost",
+            "Opens": "opens",
+            "Closes": "closes",
+            "Category": "category",
+            "Description": "description",
+        }
+        lookup = {}
+
+        event_list = None
+        with open('events.csv', 'r') as f:
+            reader = csv.reader(f)
+            event_list = list(reader)
+
+        header = event_list[0]
+        event_list = event_list[1:]
+        for idx, item_raw in enumerate(header):
+            item = item_raw.strip()
+            if item in keys:
+                lookup[keys[item]] = idx
+
+        events = []
+        for row in event_list:
+            c = {x: row[lookup[x]] for x in keys.values()}
+            events.append(Event(name=c["name"],
+                                station=c["station"],
+                                duration=c["duration"],
+                                cost=c["cost"],
+                                opens=c["opens"],
+                                closes=c["closes"],
+                                category=c["category"],
+                                description=c["description"]))
+        return events
 
 
 class Route(object):
@@ -90,9 +142,13 @@ class Route(object):
     def __init__(self, from_station_id, to_station_id):
         self.from_station_id = from_station_id
         self.to_station_id = to_station_id
-        self.duration = None
-        self.cost = None
-        self.calculate()
+        if from_station_id == to_station_id:
+            self.duration = datetime.timedelta(minutes=0)
+            self.cost = 0
+        else:
+            self.duration = None
+            self.cost = None
+            self.calculate()
 
     def calculate(self, reverse=False):
         stations = [self.from_station_id, self.to_station_id]
@@ -125,7 +181,7 @@ class Tour(object):
         self.start_time = start_time
         self.cost = 0
         self.duration = datetime.timedelta()
-        self.tags = []
+        self.category = []
         self.events = []
         self.routes = []
 
@@ -217,21 +273,31 @@ tour_end = datetime.datetime(2020, 7, 4, 17, 0)
 max_duration = tour_end - tour_start
 requirements = Requirements(max_cost, max_duration)
 
-events = load_events(path_events)
+event_factory = EventFactory()
+events = event_factory.build_from_csv(path_events)
 valid_tours = []
 
-for event_combination in generate_event_combinations(events):
-    valid_permutations = []
-    for event_permutations in itertools.permutations(event_combination):
-        tour = Tour(tour_start)
-        tour.add_events(event_permutations)
-        if check_tour_acceptable(tour, requirements):
-            valid_permutations.append(tour)
+event_combos = generate_event_combinations(events)
+for event_combination in event_combos:
+    tour = Tour(tour_start)
+    tour.add_events(event_combination)
+    if tour_is_acceptable(tour, requirements):
+        valid_tours.append(tour)
+    # valid_permutations = []
+    # print('strt')
+    # for event_permutations in itertools.permutations(event_combination):
+    #     # print('perm')
+    #     tour = Tour(tour_start)
+    #     tour.add_events(event_permutations)
+    #     if check_tour_acceptable(tour, requirements):
+    #         valid_permutations.append(tour)
+    # print('end')
 
-    durations = [tour.duration for tour in valid_permutations]
-    if len(durations) != 0:
-        min_duration = min(durations)
-        valid_tours += [tour for tour in valid_permutations if tour.duration == min_duration]
+    # durations = [tour.duration for tour in valid_permutations]
+    # print('checked')
+    # if len(durations) != 0:
+    #     min_duration = min(durations)
+    #     valid_tours += [tour for tour in valid_permutations if tour.duration == min_duration]
 
 for i, tour in enumerate(valid_tours):
     print("Tour {}".format(i))
