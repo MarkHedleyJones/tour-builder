@@ -6,12 +6,13 @@ import json
 import os
 import datetime
 
+
 def load_json(path):
-  out = None
-  if os.path.isfile(path):
-    with open(path, 'r') as f:
-      out = json.load(f)
-  return out
+    out = None
+    if os.path.isfile(path):
+        with open(path, 'r') as f:
+            out = json.load(f)
+    return out
 
 path_transit_database = "tokyo-transit.db"
 path_events = "events.json"
@@ -36,17 +37,20 @@ translation_request_template = '''
     WHERE english = "{}"
 '''
 
+
 def get_station_id(station_name):
-  request = translation_request_template.format(station_name)
-  c.execute(request)
-  res = c.fetchone()
-  if res is not None:
-    return int(res[0])
-  else:
-    return None
+    request = translation_request_template.format(station_name)
+    c.execute(request)
+    res = c.fetchone()
+    if res is not None:
+        return int(res[0])
+    else:
+        return None
+
 
 def cost_string(cost):
     return "free" if cost == 0 else "¥‎{}".format(cost)
+
 
 def duration_string(duration):
     hours, remainder = divmod(duration.seconds, 3600)
@@ -59,7 +63,9 @@ def duration_string(duration):
     else:
         return "{}m".format(minutes)
 
+
 class Event(object):
+
     def __init__(self, name, station, duration, cost=0, tags=[]):
         self.name = name
         self.station = station
@@ -73,12 +79,14 @@ class Event(object):
 
     def __str__(self):
         return "{}, {} Station, {} Yen, {}, {}".format(self.name,
-            self.station,
-            self.duration,
-            self.cost,
-            self.tags)
+                                                       self.station,
+                                                       self.duration,
+                                                       self.cost,
+                                                       self.tags)
+
 
 class Route(object):
+
     def __init__(self, from_station_id, to_station_id):
         self.from_station_id = from_station_id
         self.to_station_id = to_station_id
@@ -103,12 +111,16 @@ class Route(object):
             self.duration = datetime.timedelta(minutes=res[2])
             self.cost = res[3]
 
+
 class Requirements(object):
+
     def __init__(self, max_cost, max_duration):
         self.max_cost = max_cost
         self.max_duration = max_duration
 
+
 class Tour(object):
+
     def __init__(self, start_time):
         self.start_time = start_time
         self.cost = 0
@@ -136,7 +148,7 @@ class Tour(object):
             station_ids = [x.station_id for x in self.events]
             for index in range(len(station_ids) - 1):
                 self.add_route(Route(self.events[index].station_id,
-                                     self.events[index+1].station_id))
+                                     self.events[index + 1].station_id))
 
     def print_itineary(self):
         print(" - Total cost: {}".format(cost_string(self.cost)))
@@ -147,9 +159,11 @@ class Tour(object):
         verb = "Meet"
         for index in range(num_events):
             event = self.events[index]
-            print("     {}: {} at {} Station".format(clock.strftime("%H:%M"), verb, event.station))
+            print("     {}: {} at {} Station".format(
+                clock.strftime("%H:%M"), verb, event.station))
             verb = "Arrive"
-            print("            {} ({}, {})".format(event.name, duration_string(event.duration), cost_string(event.cost)))
+            print("            {} ({}, {})".format(event.name,
+                                                   duration_string(event.duration), cost_string(event.cost)))
             print("")
             clock += event.duration
             if index < len(self.routes):
@@ -162,7 +176,9 @@ class Tour(object):
                     cost_string(route.cost)))
                 clock += route.duration
                 print("")
-        print("     {}: Finish tour at {} Station".format(clock.strftime("%H:%M"), self.events[-1].station))
+        print("     {}: Finish tour at {} Station".format(
+            clock.strftime("%H:%M"), self.events[-1].station))
+
 
 def tour_is_acceptable(tour, requirements):
     if tour.cost > requirements.max_cost:
@@ -172,6 +188,7 @@ def tour_is_acceptable(tour, requirements):
     else:
         return True
 
+
 def check_tour_acceptable(tour, requirements):
     """ Optimisation to avoid calculating routes if not necessary"""
     if tour_is_acceptable(tour, requirements):
@@ -179,12 +196,14 @@ def check_tour_acceptable(tour, requirements):
         return tour_is_acceptable(tour, requirements)
     return False
 
+
 def generate_event_combinations(event_list):
     combos = []
-    for i in range(1, len(event_list)+1):
+    for i in range(1, len(event_list) + 1):
         els = [list(x) for x in itertools.combinations(event_list, i)]
         combos.extend(els)
     return combos
+
 
 def load_events(path_events):
     event_list = load_json(path_events)
