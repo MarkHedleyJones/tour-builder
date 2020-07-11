@@ -135,10 +135,10 @@ def parse_csv(csv_path, key_translations={}):
 
 class Route(object):
 
-    def __init__(self, from_station_id, to_station_id):
-        self.from_station_id = from_station_id
-        self.to_station_id = to_station_id
-        if from_station_id == to_station_id:
+    def __init__(self, from_station, to_station):
+        self.from_station = from_station
+        self.to_station = to_station
+        if from_station.id == to_station.id:
             self.duration = datetime.timedelta(minutes=0)
             self.cost = 0
         else:
@@ -147,7 +147,7 @@ class Route(object):
             self.calculate()
 
     def calculate(self, reverse=False):
-        stations = [self.from_station_id, self.to_station_id]
+        stations = [self.from_station.id, self.to_station.id]
         if reverse:
             stations.reverse()
         request = route_request_template.format(*stations)
@@ -164,20 +164,42 @@ class Route(object):
             self.cost = res[3]
 
 
-class Requirements(object):
+class Specifications(object):
+    cost_max = None
+    cost_min = None
+    duration_max = None
+    duration_min = None
+    num_people = None
+    time_end_early = None
+    time_end_late = None
+    time_start = None
 
-    def __init__(self, max_cost, max_duration):
-        self.max_cost = max_cost
-        self.max_duration = max_duration
+    def __init__(self, num_people=1, start_hour=8, start_minute=0):
+        self.num_people = num_people
+        self.time_start = datetime.datetime(
+            1970, 1, 1, start_hour, start_minute)
+
+    def set_cost_max(self, cost):
+        self.cost_max = cost
+
+    def set_cost_min(self, cost):
+        self.cost_min = cost
+
+    def set_time_end_late(self, hour, minute):
+        self.time_end_late = datetime.datetime(1970, 1, 1, hour, minute)
+        self.duration_max = self.time_end_late - self.time_start
+
+    def set_time_end_early(self, hour, minute):
+        self.time_end_early = datetime.datetime(1970, 1, 1, hour, minute)
+        self.duration_min = self.time_end_early - self.time_start
 
 
 class Tour(object):
 
-    def __init__(self, start_time):
-        self.start_time = start_time
+    def __init__(self, specs):
+        self.specs = specs
         self.cost = 0
         self.duration = datetime.timedelta()
-        self.category = []
         self.events = []
         self.routes = []
 
@@ -197,16 +219,32 @@ class Tour(object):
 
     def calculate_routes(self):
         if len(self.events) > 1:
-            station_ids = [x.station_id for x in self.events]
-            for index in range(len(station_ids) - 1):
-                self.add_route(Route(self.events[index].station_id,
-                                     self.events[index + 1].station_id))
+            stations = [x.station for x in self.events]
+            for index in range(len(stations) - 1):
+                self.add_route(Route(stations[index],
+                                     stations[index + 1]))
+
+    def meets_specs(self):
+        if specs.cost_max is not None and self.cost > specs.cost_max:
+            return False
+        elif specs.cost_min is not None and self.cost < specs.cost_min:
+            return False
+        elif specs.duration_max is not None and self.duration > specs.duration_max:
+            return False
+        elif specs.duration_min is not None and self.duration < specs.duration_min:
+            return False
+        else:
+            return True
+
+    def optimise(self):
+        if self.meets_specs():
+            self.calculate_routes()
 
     def print_itineary(self):
         print(" - Total cost: {}".format(cost_string(self.cost)))
         print(" - Total time: {}".format(duration_string(self.duration)))
         print(" - Itineary:")
-        clock = self.start_time
+        clock = self.specs.time_start
         num_events = len(self.events)
         verb = "Meet"
         for index in range(num_events):
@@ -230,23 +268,6 @@ class Tour(object):
                 print("")
         print("     {}: Finish tour at {} Station".format(
             clock.strftime("%H:%M"), self.events[-1].station.name))
-
-
-def tour_is_acceptable(tour, requirements):
-    if tour.cost > requirements.max_cost:
-        return False
-    elif tour.duration > requirements.max_duration:
-        return False
-    else:
-        return True
-
-
-def check_tour_acceptable(tour, requirements):
-    """ Optimisation to avoid calculating routes if not necessary"""
-    if tour_is_acceptable(tour, requirements):
-        tour.calculate_routes()
-        return tour_is_acceptable(tour, requirements)
-    return False
 
 
 def generate_event_combinations(event_list):
@@ -275,19 +296,21 @@ def load_events(path_events):
 
 
 events = load_events(path_events)
-max_cost = 100000
-tour_start = datetime.datetime(2020, 7, 4, 8, 0)
-tour_end = datetime.datetime(2020, 7, 4, 17, 0)
-max_duration = tour_end - tour_start
-requirements = Requirements(max_cost, max_duration)
+
+# Setup tour specifications
+specs = Specifications(num_people=1, start_hour=8)
+specs.set_cost_max(100000)
+specs.set_time_end_early(16, 0)
+specs.set_time_end_late(17, 0)
 
 valid_tours = []
 
 event_combos = generate_event_combinations(events)
 for event_combination in event_combos:
-    tour = Tour(tour_start)
+    tour = Tour(specs)
     tour.add_events(event_combination)
-    if tour_is_acceptable(tour, requirements):
+    tour.optimise()
+    if tour.meets_specs():
         valid_tours.append(tour)
     # valid_permutations = []
     # print('strt')
@@ -295,7 +318,7 @@ for event_combination in event_combos:
     #     # print('perm')
     #     tour = Tour(tour_start)
     #     tour.add_events(event_permutations)
-    #     if check_tour_acceptable(tour, requirements):
+    #     if check_tour_acceptable(tour, specs):
     #         valid_permutations.append(tour)
     # print('end')
 
