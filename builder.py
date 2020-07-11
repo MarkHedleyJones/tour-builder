@@ -69,72 +69,68 @@ def duration_string(duration):
 
 class Event(object):
 
-    def __init__(self, name, station, duration, cost, opens, closes, category, description):
-        self.name = name
-        self.station = station
-        self.station_id = get_station_id(station)
-        if type(duration) is float or type(duration) is int:
-            self.duration = datetime.timedelta(hours=duration)
-        elif type(duration) is str:
-            self.duration = datetime.timedelta(hours=float(duration))
+    def __init__(self, info):
+        self.name = info['name']
+        self.station = Station(info['station'])
+        if type(info['duration']) is float or type(info['duration']) is int:
+            self.duration = datetime.timedelta(hours=info['duration'])
+        elif type(info['duration']) is str:
+            self.duration = datetime.timedelta(hours=float(info['duration']))
         else:
-            self.duration = duration
-        self.cost = int(cost)
-        self.opens = time.strftime(opens)
-        self.closes = time.strftime(closes)
-        self.category = category
-        self.description = description
+            self.duration = info['duration']
+
+        self.cost = int(info['cost'])
+        self.opens = time.strftime(info['opens'])
+        self.closes = time.strftime(info['closes'])
+        self.category = info['category']
+        self.description = info['description']
 
     def __str__(self):
-        return "{}, {} Station, {} Yen, {}, {}".format(self.name,
-                                                       self.station,
-                                                       self.duration,
-                                                       self.cost,
-                                                       self.opens,
-                                                       self.closes,
-                                                       self.category,
-                                                       self.description)
+        return "Event: " + str({
+            "name": self.name,
+            "station": self.station,
+            "duration": self.duration,
+            "cost": self.cost,
+            "opens": self.opens,
+            "closes": self.closes,
+            "category": self.category,
+            "description": self.description
+        })
 
 
-class EventFactory(object):
+class Station(object):
+    def __init__(self, name):
+        self.name = name
+        self.id = get_station_id(name)
 
-    def build_from_csv(self, csv_path):
-        keys = {
-            "Place Name": "name",
-            "Train Station": "station",
-            "Time at Place (hours)": "duration",
-            "Cost (per person)": "cost",
-            "Opens": "opens",
-            "Closes": "closes",
-            "Category": "category",
-            "Description": "description",
-        }
-        lookup = {}
+    def __str__(self):
+        return "Station: " + str({
+            "name": self.name,
+            "id": self.id
+        })
 
-        event_list = None
-        with open('events.csv', 'r') as f:
-            reader = csv.reader(f)
-            event_list = list(reader)
 
-        header = event_list[0]
-        event_list = event_list[1:]
-        for idx, item_raw in enumerate(header):
-            item = item_raw.strip()
-            if item in keys:
-                lookup[keys[item]] = idx
+def load_csv(csv_path):
+    out = []
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        out = list(reader)
+    return out
 
-        events = []
-        for row in event_list:
-            c = {x: row[lookup[x]] for x in keys.values()}
-            events.append(Event(name=c["name"],
-                                station=c["station"],
-                                duration=c["duration"],
-                                cost=c["cost"],
-                                opens=c["opens"],
-                                closes=c["closes"],
-                                category=c["category"],
-                                description=c["description"]))
-        return events
+
+def parse_csv(csv_path, key_translations={}):
+    csv_data = load_csv(csv_path)
+    header = csv_data[0]
+    # Apply any header translations
+    for key in key_translations:
+        header[header.index(key)] = key_translations[key]
+
+    data = csv_data[1:]
+    out = []
+    for row in data:
+        out.append({key: row[idx]
+                    for idx, key in enumerate(header) if key is not None})
+    return out
 
 
 class Route(object):
@@ -216,7 +212,7 @@ class Tour(object):
         for index in range(num_events):
             event = self.events[index]
             print("     {}: {} at {} Station".format(
-                clock.strftime("%H:%M"), verb, event.station))
+                clock.strftime("%H:%M"), verb, event.station.name))
             verb = "Arrive"
             print("            {} ({}, {})".format(event.name,
                                                    duration_string(event.duration), cost_string(event.cost)))
@@ -226,14 +222,14 @@ class Tour(object):
                 route = self.routes[index]
                 print("     {}: Train from {} Station to {} Station ({} mins, {})".format(
                     clock.strftime("%H:%M"),
-                    event.station,
-                    self.events[index + 1].station,
+                    event.station.name,
+                    self.events[index + 1].station.name,
                     duration_string(route.duration),
                     cost_string(route.cost)))
                 clock += route.duration
                 print("")
         print("     {}: Finish tour at {} Station".format(
-            clock.strftime("%H:%M"), self.events[-1].station))
+            clock.strftime("%H:%M"), self.events[-1].station.name))
 
 
 def tour_is_acceptable(tour, requirements):
@@ -262,19 +258,29 @@ def generate_event_combinations(event_list):
 
 
 def load_events(path_events):
-    event_list = load_json(path_events)
-    events = [Event(*event) for event in event_list]
+    keys = {
+        "Place Name": "name",
+        "Train Station": "station",
+        "Time at Place (hours)": "duration",
+        "Cost (per person)": "cost",
+        "Opens": "opens",
+        "Closes": "closes",
+        "Category": "category",
+        "Description": "description",
+        "Station Valid": None
+    }
+    data = parse_csv(path_events, keys)
+    events = [Event(x) for x in data]
     return events
 
 
+events = load_events(path_events)
 max_cost = 100000
 tour_start = datetime.datetime(2020, 7, 4, 8, 0)
 tour_end = datetime.datetime(2020, 7, 4, 17, 0)
 max_duration = tour_end - tour_start
 requirements = Requirements(max_cost, max_duration)
 
-event_factory = EventFactory()
-events = event_factory.build_from_csv(path_events)
 valid_tours = []
 
 event_combos = generate_event_combinations(events)

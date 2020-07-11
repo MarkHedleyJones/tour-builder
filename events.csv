@@ -1,19 +1,19 @@
-Place Name,Train Station,Station Valid,Time at Place (hours),Cost (per person),Opens,Closes,Category ,Description ,Holiday
-Asakusa Temple,Asakusa,Yes,3,0,,,temple,,
-Meiji Jingu Shrine,Harajuku,Yes,1.5,0,5:00,18:00,temple,,
-Fuku-mirai,Ebisu,Yes,2,8000,18:00,0:00,restaurant,dinner,
-Little Nap Coffee Roasters,Yoyogi-koen,Yes,0.5,700,9:00,19:00,cafe,,
-Skytree,Tokyo Skytree,Yes,1,3400,9:00,21:00,view,,
-Emperial Palace,Otemachi,Yes,3,0,,,historical,,
-Government Buildings,Shinjuku,Yes,2.5,0,8:30,17:00,view,,
-Path,Yoyogi-hachiman,Yes,1.5,2500,8:00,14:00,cafe,,
-Eatrip,Harajuku,Yes,2,8000,18:00,0:00,Restaurant,,
-Yoyogi park ,Harajuku,Yes,1.5,0,,,park,,
-Roppongi Hills,Roppongi,Yes,2,1800,11:00,20:00,observatory ,,
-yamatane museum,Ebisu,Yes,2,1100,10:00,17:00,museum,This is Japan's a first museum dedicated to Japanese-style paintings. ,
-Path,Yoyogi-hachiman,Yes,1.5,2500,18:00,23:00,cafe,,Monday
-cosme,Harajuku,Yes,1,0,11:00,21:00,Shopping,The largest beauty shopping center,
-Ichiran ,Harajuku,Yes,1,1200,11:00,22:00,Ramen,Tonkotsu ,
-Takeshita-dori,Harajuku,Yes,1,0,,,Shopping street,"Daiso, Calbee etc",
-Institute of nature study,Meguro,Yes,1,310,9:00,16:30,Park,,Monday
-Gajoen,Meguro,Yes,1,0,,,,,
+Place Name,Train Station,Station Valid,Time at Place (hours),Cost (per person),Opens,Closes,Category,Description
+Asakusa Temple,Asakusa,Yes,3,0,,,temple,
+Meiji Jingu Shrine,Harajuku,Yes,1.5,0,5:00,18:00,temple,
+Fuku-mirai,Ebisu,Yes,2,8000,18:00,0:00,restaurant,
+Little Nap Coffee Roasters,Yoyogi-koen,Yes,0.5,700,9:00,19:00,cafe,
+Skytree,Tokyo Skytree,Yes,1,3400,9:00,21:00,observatory ,
+Emperial Palace,Otemachi,Yes,3,0,,,cultural,
+Government Buildings,Shinjuku,Yes,2.5,0,8:30,17:00,observatory ,
+Path,Yoyogi-hachiman,Yes,1.5,2500,8:00,14:00,cafe,
+Eatrip,Harajuku,Yes,2,8000,18:00,0:00,restaurant,
+Yoyogi park ,Harajuku,Yes,1.5,0,,,park,
+Roppongi Hills,Roppongi,Yes,2,1800,11:00,20:00,observatory ,
+yamatane museum,Ebisu,Yes,2,1100,10:00,17:00,museum,This is Japan's a first museum dedicated to Japanese-style paintings.
+Path,Yoyogi-hachiman,Yes,1.5,2500,18:00,23:00,restaurant,
+cosme,Harajuku,Yes,1,0,11:00,21:00,shopping,The largest beauty shopping center
+Ichiran ,Harajuku,Yes,1,1200,11:00,22:00,food,Tonkotsu Ramen
+Takeshita-dori,Harajuku,Yes,1,0,,,shopping,"Daiso, Calbee etc"
+Institute of nature study,Meguro,Yes,1,310,9:00,16:30,park,
+Gajoen,Meguro,Yes,1,0,,,,
