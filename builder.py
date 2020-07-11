@@ -154,17 +154,13 @@ class Route(object):
 
     def calculate(self, reverse=False):
         stations = [self.from_station.id, self.to_station.id]
-        if reverse:
-            stations.reverse()
+        stations.sort()
         request = self.request_template.format(*stations)
         c.execute(request)
         res = c.fetchone()
         if res is None:
-            if reverse is False:
-                return self.calculate(reverse=True)
-            else:
-                print("Cant find link between stations")
-                raise
+            print("Cant find link between stations")
+            raise
         else:
             self.duration = datetime.timedelta(minutes=res[2])
             self.cost = res[3]
