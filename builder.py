@@ -8,47 +8,51 @@ import os
 import sqlite3
 import time
 
-
-def load_json(path):
-    out = None
-    if os.path.isfile(path):
-        with open(path, 'r') as f:
-            out = json.load(f)
-    return out
-
-
 path_transit_database = "tokyo-transit.db"
 path_events = "events.csv"
 
 conn = sqlite3.connect(path_transit_database)
 c = conn.cursor()
 
-route_request_template = '''
-  SELECT from_id,
-         to_id,
-         mins,
-         cost,
-         transfers
-  FROM routes
-  WHERE from_id = "{}"
-  AND to_id = "{}";
-'''
 
-translation_request_template = '''
-    SELECT station_id
-    FROM stations
-    WHERE english = "{}"
-'''
+def load_csv(csv_path):
+    out = []
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        out = list(reader)
+    return out
 
 
-def get_station_id(station_name):
-    request = translation_request_template.format(station_name)
-    c.execute(request)
-    res = c.fetchone()
-    if res is not None:
-        return int(res[0])
-    else:
-        return None
+def parse_csv(csv_path, key_translations={}):
+    csv_data = load_csv(csv_path)
+    header = csv_data[0]
+    # Apply any header translations
+    for key in key_translations:
+        header[header.index(key)] = key_translations[key]
+
+    data = csv_data[1:]
+    out = []
+    for row in data:
+        out.append({key: row[idx]
+                    for idx, key in enumerate(header) if key is not None})
+    return out
+
+
+def load_events(path_events):
+    keys = {
+        "Place Name": "name",
+        "Train Station": "station",
+        "Time at Place (hours)": "duration",
+        "Cost (per person)": "cost",
+        "Opens": "opens",
+        "Closes": "closes",
+        "Category": "category",
+        "Description": "description",
+        "Station Valid": None
+    }
+    data = parse_csv(path_events, keys)
+    events = [Event(x) for x in data]
+    return events
 
 
 def cost_string(cost):
@@ -99,9 +103,15 @@ class Event(object):
 
 
 class Station(object):
+    request_template = '''
+        SELECT station_id
+        FROM stations
+        WHERE english = "{}"
+    '''
+
     def __init__(self, name):
         self.name = name
-        self.id = get_station_id(name)
+        self.id = self.get_station_id(name)
 
     def __str__(self):
         return "Station: " + str({
@@ -109,31 +119,27 @@ class Station(object):
             "id": self.id
         })
 
-
-def load_csv(csv_path):
-    out = []
-    with open(csv_path, 'r') as f:
-        reader = csv.reader(f)
-        out = list(reader)
-    return out
-
-
-def parse_csv(csv_path, key_translations={}):
-    csv_data = load_csv(csv_path)
-    header = csv_data[0]
-    # Apply any header translations
-    for key in key_translations:
-        header[header.index(key)] = key_translations[key]
-
-    data = csv_data[1:]
-    out = []
-    for row in data:
-        out.append({key: row[idx]
-                    for idx, key in enumerate(header) if key is not None})
-    return out
+    def get_station_id(self, name):
+        request = self.request_template.format(self.name)
+        c.execute(request)
+        res = c.fetchone()
+        if res is not None:
+            return int(res[0])
+        else:
+            return None
 
 
 class Route(object):
+    request_template = '''
+      SELECT from_id,
+             to_id,
+             mins,
+             cost,
+             transfers
+      FROM routes
+      WHERE from_id = "{}"
+      AND to_id = "{}";
+    '''
 
     def __init__(self, from_station, to_station):
         self.from_station = from_station
@@ -150,7 +156,7 @@ class Route(object):
         stations = [self.from_station.id, self.to_station.id]
         if reverse:
             stations.reverse()
-        request = route_request_template.format(*stations)
+        request = self.request_template.format(*stations)
         c.execute(request)
         res = c.fetchone()
         if res is None:
@@ -284,23 +290,6 @@ def generate_event_combinations(event_list):
         els = [list(x) for x in itertools.combinations(event_list, i)]
         combos.extend(els)
     return combos
-
-
-def load_events(path_events):
-    keys = {
-        "Place Name": "name",
-        "Train Station": "station",
-        "Time at Place (hours)": "duration",
-        "Cost (per person)": "cost",
-        "Opens": "opens",
-        "Closes": "closes",
-        "Category": "category",
-        "Description": "description",
-        "Station Valid": None
-    }
-    data = parse_csv(path_events, keys)
-    events = [Event(x) for x in data]
-    return events
 
 
 events = load_events(path_events)
