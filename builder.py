@@ -198,24 +198,32 @@ class Tour(object):
 
     def __init__(self, specs):
         self.specs = specs
-        self.cost = 0
-        self.duration = datetime.timedelta()
+        self.cost_events = 0
+        self.cost_transport = 0
+        self.duration_events = datetime.timedelta()
+        self.duration_transport = datetime.timedelta()
         self.events = []
         self.routes = []
 
     def add_event(self, event):
         self.events.append(event)
-        self.cost += event.cost
-        self.duration += event.duration
+        self.cost_events += event.cost
+        self.duration_events += event.duration
 
     def add_events(self, events):
         for event in events:
             self.add_event(event)
 
     def add_route(self, route):
-        self.cost += route.cost
-        self.duration += route.duration
+        self.cost_transport += route.cost
+        self.duration_transport += route.duration
         self.routes.append(route)
+
+    def total_cost(self):
+        return self.cost_events + self.cost_transport
+
+    def total_duration(self):
+        return self.duration_events + self.duration_transport
 
     def calculate_routes(self):
         if len(self.events) > 1:
@@ -225,13 +233,13 @@ class Tour(object):
                                      stations[index + 1]))
 
     def meets_specs(self):
-        if specs.cost_max is not None and self.cost > specs.cost_max:
+        if specs.cost_max is not None and self.total_cost() > specs.cost_max:
             return False
-        elif specs.cost_min is not None and self.cost < specs.cost_min:
+        elif specs.cost_min is not None and self.total_cost() < specs.cost_min:
             return False
-        elif specs.duration_max is not None and self.duration > specs.duration_max:
+        elif specs.duration_max is not None and self.total_duration() > specs.duration_max:
             return False
-        elif specs.duration_min is not None and self.duration < specs.duration_min:
+        elif specs.duration_min is not None and self.total_duration() < specs.duration_min:
             return False
         else:
             return True
@@ -241,8 +249,8 @@ class Tour(object):
             self.calculate_routes()
 
     def print_itineary(self):
-        print(" - Total cost: {}".format(cost_string(self.cost)))
-        print(" - Total time: {}".format(duration_string(self.duration)))
+        print(" - Total cost: {}".format(cost_string(self.total_cost())))
+        print(" - Total time: {}".format(duration_string(self.total_duration())))
         print(" - Itineary:")
         clock = self.specs.time_start
         num_events = len(self.events)
