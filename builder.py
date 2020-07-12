@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import copy
 import csv
 import datetime
 import itertools
@@ -13,6 +14,10 @@ path_activities = "activities.csv"
 
 conn = sqlite3.connect(path_transit_database)
 c = conn.cursor()
+
+ref_date = datetime.date(1970, 1, 1)
+day_start = datetime.time(0, 0, 0)
+day_end = datetime.time(23, 59, 59)
 
 
 def load_csv(csv_path):
@@ -83,10 +88,7 @@ class Station(object):
         self.id = self.get_station_id(name)
 
     def __str__(self):
-        return "Station: " + str({
-            "name": self.name,
-            "id": self.id
-        })
+        return "{} Station".format(self.name)
 
     def get_station_id(self, name):
         request = self.request_template.format(self.name)
@@ -108,10 +110,9 @@ class Specifications(object):
     num_people = None
     start_time = None
 
-    def __init__(self, num_people=1, start_hour=8, start_minute=0):
+    def __init__(self, num_people=1, start_time=datetime.time(8, 0)):
         self.num_people = num_people
-        self.start_time = datetime.datetime(
-            1970, 1, 1, start_hour, start_minute)
+        self.start_time = datetime.datetime.combine(ref_date, start_time)
 
     def set_max_cost(self, cost):
         self.max_cost = cost
@@ -119,12 +120,12 @@ class Specifications(object):
     def set_min_cost(self, cost):
         self.min_cost = cost
 
-    def set_max_end_time(self, hour, minute):
-        self.max_end_time = datetime.datetime(1970, 1, 1, hour, minute)
+    def set_max_end_time(self, max_end_time):
+        self.max_end_time = datetime.datetime.combine(ref_date, max_end_time)
         self.max_duration = self.max_end_time - self.start_time
 
-    def set_min_end_time(self, hour, minute):
-        self.min_end_time = datetime.datetime(1970, 1, 1, hour, minute)
+    def set_min_end_time(self, min_end_time):
+        self.min_end_time = datetime.datetime.combine(ref_date, min_end_time)
         self.min_duration = self.min_end_time - self.start_time
 
     def too_expensive(self, cost):
@@ -139,45 +140,106 @@ class Specifications(object):
     def too_short(self, duration):
         return self.min_duration is not None and duration < self.min_duration
 
+    def above_maximum(self, cost, duration):
+        return self.too_expensive(cost) or self.too_long(duration)
+
     def below_maximum(self, cost, duration):
         return not self.too_expensive(cost) and not self.too_long(duration)
+
+    def above_minimum(self, cost, duration):
+        return not self.too_cheap(cost) and not self.too_short(duration)
+
+    def within_spec(self, cost, duration):
+        return self.above_minimum(cost, duration) and self.below_maximum(cost, duration)
+
+
+def to_time(input, default=datetime.time(0, 0)):
+    if input is None or input == '':
+        return datetime.datetime.combine(ref_date, default)
+    elif type(input) is type(datetime.datetime.now()):
+        return input
+    elif type(input) is type(datetime.time()):
+        return datetime.datetime.combine(ref_date, input)
+    elif type(input) is str:
+        a = datetime.datetime.strptime(input, '%H:%M')
+        return datetime.datetime.combine(ref_date, a.time())
+    else:
+        print("Error: unknown time type {}".format(input))
+
+
+def to_duration(input, default=datetime.timedelta()):
+    if input is None or input is '':
+        return datetime.timedelta(minutes=0)
+    elif type(input) is str:
+        return datetime.timedelta(hours=float(input))
+    elif type(input) is type(datetime.timedelta()):
+        return input
+    elif type(input) is float or type(input) is int:
+        return datetime.timedelta(hours=input)
+    else:
+        print(type(input))
+        print("Error: unknown duration type {}".format(input))
+
+
+def to_money(input, default=0):
+    if type(input) is int:
+        return input
+    elif input is None:
+        return default
+    else:
+        return int(input)
 
 
 class Event(object):
     # TODO: Move opens and closes to Event (even for trains etc)
-    def __init__(self, cost, duration):
-        self.cost = cost
-        self.duration = duration
+    def __init__(self, cost=None, duration=None, available_from=None,
+                 available_until=None):
+        self.cost = to_money(cost)
+        self.duration = to_duration(duration)
+        self.available_from = to_time(available_from)
+        self.available_until = to_time(available_until, default=day_end)
+
+    def __str__(self):
+        return "Generic event"
+
+
+class Meet(Event):
+    def __init__(self, station, duration=None):
+        self.station = station
+        if duration is None:
+            duration = datetime.timedelta(minutes=15)
+        super().__init__(cost=0, duration=duration)
+
+    def __str__(self):
+        return "Meet at {}".format(self.station)
 
 
 class Activity(Event):
+    category_to_verb = {
+        'restaurant': 'Dine at',
+        'cultural': 'See',
+        'cafe': 'Take a break at',
+        'shopping': "Shop at"
+    }
+
     def __init__(self, info):
         self.name = info['name']
         self.station = Station(info['station'])
-        if type(info['duration']) is float or type(info['duration']) is int:
-            self.duration = datetime.timedelta(hours=info['duration'])
-        elif type(info['duration']) is str:
-            self.duration = datetime.timedelta(hours=float(info['duration']))
-        else:
-            self.duration = info['duration']
-
-        self.cost = int(info['cost'])
-        self.opens = time.strftime(info['opens'])
-        self.closes = time.strftime(info['closes'])
         self.category = info['category']
         self.description = info['description']
+        super().__init__(cost=int(info['cost']),
+                         duration=info['duration'],
+                         available_from=info['opens'],
+                         available_until=info['closes'])
 
     def __str__(self):
-        return "Activity: " + str({
-            "name": self.name,
-            "station": self.station,
-            "duration": self.duration,
-            "cost": self.cost,
-            "opens": self.opens,
-            "closes": self.closes,
-            "category": self.category,
-            "description": self.description
-        })
+        verb = "Visit"
+        if self.category in self.category_to_verb:
+            verb = self.category_to_verb[self.category]
+        return "{} {}".format(verb, self.name)
+
+    def __repr__(self):
+        return self.name
 
 
 class Transport(Event):
@@ -223,6 +285,9 @@ class Transport(Event):
             self.duration = datetime.timedelta(minutes=res[2])
             self.cost = res[3]
 
+    def __str__(self):
+        return "Train from {} to {}".format(self.from_station, self.to_station)
+
 
 class Tour(object):
 
@@ -245,25 +310,64 @@ class Tour(object):
         cost = self.cost + event.cost
         duration = self.duration + event.duration
 
+        # Check that we can start this now
+        if self.end_time < event.available_from:
+            return False
+        # Check that its available for as long as we need
+        if self.end_time + event.duration > event.available_until:
+            return False
+
         # Check if transport is required
-        if last_event is None or last_event.station == event.station:
+        if last_event is None:
+            # Add the first meet & greet
+            self._add_event(Meet(event.station))
+            # Check that this event wouldn't exceed budgets
+            if self.specs.below_maximum(cost, duration):
+                self._add_event(event)
+                return True
+        elif last_event.station.name == event.station.name:
             # Check that this wouldn't exceed budgets
             if self.specs.below_maximum(cost, duration):
                 self._add_event(event)
-                success = True
+                return True
         else:
             # Calculate the transport
             transport = Transport(last_event, event)
             cost += transport.cost
             duration += transport.duration
-
             # Check that this wouldn't exceed budgets
             if self.specs.below_maximum(cost, duration):
                 self._add_event(transport)
                 self._add_event(event)
-                success = True
+                return True
+        return False
 
-        return success
+    def within_spec(self):
+        return self.specs.within_spec(self.cost, self.duration)
+
+    def exceeds_spec(self):
+        return self.specs.above_maximum(self.cost, self.duration)
+
+    def remaining_time(self):
+        return self.specs.max_duration - self.duration
+
+    def remaining_money(self):
+        return self.specs.max_cost - self.cost
+
+    def __str__(self):
+        return "Tour with {} events".format(len(self.events))
+
+    def print_itineary(self):
+        print(" - Total cost: {}".format(cost_string(self.cost)))
+        print(" - Total time: {}".format(duration_string(self.duration)))
+        print(" - Itineary:")
+        verb = "Meet"
+        clock = self.specs.start_time
+        for event in self.events:
+            print("     {}: {}".format(clock.strftime("%H:%M"), event))
+            clock += event.duration
+        print("     {}: Finish tour at {}".format(
+            clock.strftime("%H:%M"), self.events[-1].station))
 
 
 def generate_event_combinations(event_list):
@@ -277,15 +381,42 @@ def generate_event_combinations(event_list):
 activities = load_activities(path_activities)
 
 # Setup tour specifications
-specs = Specifications(num_people=1, start_hour=8)
+specs = Specifications(num_people=1, start_time=datetime.time(8, 0))
 specs.set_max_cost(100000)
-specs.set_min_end_time(16, 0)
-specs.set_max_end_time(17, 0)
+specs.set_min_end_time(datetime.time(16, 0))
+specs.set_max_end_time(datetime.time(17, 0))
 
-valid_tours = []
 
-event_combos = generate_event_combinations(activities)
-for event_combination in event_combos:
+def build_tours(valid_tours, tour, activities, depth=0):
+    depth += 1
+
+    cost_limit = tour.remaining_money()
+    duration_limit = tour.remaining_time()
+
+    activities = [x for x in activities if x.duration <
+                  duration_limit and x.cost < cost_limit]
+
+    for index in range(len(activities)):
+        activities_copy = copy.copy(activities)
+        activity = activities_copy[index]
+        activities_copy.remove(activity)
+        tour_copy = copy.deepcopy(tour)
+        if tour_copy.add_activity(activity):
+            if tour_copy.within_spec():
+                valid_tours.append(tour_copy)
+            build_tours(valid_tours, tour_copy, activities_copy, depth)
+
+
+tours = []
+
+for index in range(len(activities)):
+    activity_list = copy.copy(activities)
     tour = Tour(specs)
-    for activity in event_combination:
-        tour.add_activity(activity)
+    if tour.add_activity(activity_list.pop(index)):
+        build_tours(tours, tour, activity_list)
+
+for tour_number, tour in enumerate(tours):
+    print("Tour Idea {}:".format(tour_number))
+    tour.print_itineary()
+    print("")
+("")
