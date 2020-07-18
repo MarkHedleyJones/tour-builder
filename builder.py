@@ -16,8 +16,35 @@ conn = sqlite3.connect(path_transit_database)
 c = conn.cursor()
 
 ref_date = datetime.date(1970, 1, 1)
-day_start = datetime.time(0, 0, 0)
-day_end = datetime.time(23, 59, 59)
+
+
+def time(hours, minutes=0, seconds=0):
+    return datetime.datetime.combine(ref_date,
+                                     datetime.time(hours, minutes, seconds))
+
+
+day_start = time(0)
+day_end = time(23, 59, 59)
+minimum_event_duration = datetime.timedelta(minutes=15)
+
+meal_times = {
+    'breakfast': {
+        'start': day_start,
+        'end': time(10, 30)
+    },
+    'lunch': {
+        'start': time(10, 30),
+        'end': time(15, 30)
+    },
+    'dinner': {
+        'start': time(15, 30),
+        'end': day_end
+    },
+    'coffee': {
+        'start': day_start,
+        'end': time(17, 0)
+    }
+}
 
 
 def load_csv(csv_path):
@@ -56,7 +83,15 @@ def load_activities(path_activities):
         "Station Valid": None
     }
     data = parse_csv(path_activities, keys)
-    activities = [Activity(x) for x in data]
+    activities = []
+    for activity in data:
+        activities.append(Activity(location=Station(activity['station']),
+                                   duration=to_duration(activity['duration']),
+                                   title=activity['name'],
+                                   cost=to_money(activity['cost']),
+                                   available_from=to_time(activity['opens']),
+                                   available_until=to_time(activity['closes']),
+                                   category=activity['category']))
     return activities
 
 
@@ -76,7 +111,15 @@ def duration_string(duration):
         return "{}m".format(minutes)
 
 
-class Station(object):
+class Location(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+
+class Station(Location):
     request_template = '''
         SELECT station_id
         FROM stations
@@ -84,11 +127,8 @@ class Station(object):
     '''
 
     def __init__(self, name):
-        self.name = name
+        super(Station, self).__init__(name)
         self.id = self.get_station_id(name)
-
-    def __str__(self):
-        return "{} Station".format(self.name)
 
     def get_station_id(self, name):
         request = self.request_template.format(self.name)
@@ -97,7 +137,11 @@ class Station(object):
         if res is not None:
             return int(res[0])
         else:
+            raise
             return None
+
+    def __str__(self):
+        return "{} Station".format(self.name)
 
 
 class Specifications(object):
@@ -109,6 +153,10 @@ class Specifications(object):
     min_duration = None
     num_people = None
     start_time = None
+    include_breakfast = None
+    include_lunch = None
+    include_dinner = None
+    include_coffee = None
 
     def __init__(self, num_people=1, start_time=datetime.time(8, 0)):
         self.num_people = num_people
@@ -153,9 +201,9 @@ class Specifications(object):
         return self.above_minimum(cost, duration) and self.below_maximum(cost, duration)
 
 
-def to_time(input, default=datetime.time(0, 0)):
+def to_time(input, default=day_start):
     if input is None or input == '':
-        return datetime.datetime.combine(ref_date, default)
+        return default
     elif type(input) is type(datetime.datetime.now()):
         return input
     elif type(input) is type(datetime.time()):
@@ -192,90 +240,86 @@ def to_money(input, default=0):
 
 class Event(object):
     # TODO: Move opens and closes to Event (even for trains etc)
-    def __init__(self, cost=None, duration=None, available_from=None,
-                 available_until=None):
-        self.cost = to_money(cost)
-        self.duration = to_duration(duration)
-        self.available_from = to_time(available_from)
-        self.available_until = to_time(available_until, default=day_end)
+    def __init__(self, title, location, duration, cost, category=None):
+        self.title = title
+        self.location = location
+        self.duration = duration
+        self.cost = cost
+        self.category = category
 
     def __str__(self):
-        return "Generic event"
+        return self.title
 
 
 class Meet(Event):
-    def __init__(self, station, duration=None):
-        self.station = station
-        if duration is None:
-            duration = datetime.timedelta(minutes=15)
-        super().__init__(cost=0, duration=duration)
-
-    def __str__(self):
-        return "Meet at {}".format(self.station)
+    def __init__(self, location):
+        super(Meet, self).__init__(title=location.name,
+                                   location=location,
+                                   duration=datetime.timedelta(minutes=15),
+                                   cost=0,
+                                   category="meet")
 
 
 class Activity(Event):
-    category_to_verb = {
-        'restaurant': 'Dine at',
-        'cultural': 'See',
-        'cafe': 'Take a break at',
-        'shopping': "Shop at"
-    }
+    available_from = None
+    available_until = None
 
-    def __init__(self, info):
-        self.name = info['name']
-        self.station = Station(info['station'])
-        self.category = info['category']
-        self.description = info['description']
-        super().__init__(cost=int(info['cost']),
-                         duration=info['duration'],
-                         available_from=info['opens'],
-                         available_until=info['closes'])
+    def __init__(self, title, location, duration, cost,
+                 available_from=day_start, available_until=day_end,
+                 category=None):
+        super(Activity, self).__init__(title, location, duration, cost)
+        self.available_from = available_from
+        self.available_until = available_until
+        self.category = category
+
+    def would_be_meal(self, start_time):
+        if self.category == 'food':
+            for meal_type in meal_times.keys():
+                if start_time > meal_times[meal_type]['start'] \
+                        and start_time < meal_times[meal_type]['end']:
+                    return meal_type
+        elif self.category == 'coffee':
+            if start_time > meal_times['coffee']['start'] \
+                    and start_time < meal_times['coffee']['end']:
+                return 'coffee'
+        return False
 
     def __str__(self):
-        verb = "Visit"
-        if self.category in self.category_to_verb:
-            verb = self.category_to_verb[self.category]
-        return "{} {}".format(verb, self.name)
+        return self.title
 
     def __repr__(self):
-        return self.name
+        return self.title
 
 
 class Transport(Event):
+    def __init__(self, from_location, to_location, duration, cost, category="move"):
+        self.destination = to_location
+        title = "{} -> {}".format(from_location, to_location)
+        super(Transport, self).__init__(
+            title, from_location, duration, cost, category)
 
-    request_template = '''
-      SELECT from_id,
-             to_id,
-             mins,
-             cost,
-             transfers
-      FROM routes
-      WHERE from_id = "{}"
-      AND to_id = "{}";
-    '''
 
-    def __init__(self, start, finish):
-        if type(start) != type(finish):
-            print("Error!")
-        elif type(start) == Station:
-            self.from_station = start
-            self.to_station = finish
-        elif type(start) == Activity:
-            self.from_station = start.station
-            self.to_station = finish.station
-        if self.from_station.id == self.to_station.id:
-            self.duration = datetime.timedelta(minutes=0)
-            self.cost = 0
-        else:
-            self.duration = None
-            self.cost = None
-            self.calculate()
+class TrainRide(Transport):
+
+    def __init__(self, from_station, to_station):
+        super(TrainRide, self).__init__(from_station, to_station,
+                                        datetime.timedelta(), 0, "ride")
+        self.calculate()
 
     def calculate(self):
-        stations = [self.from_station.id, self.to_station.id]
+        request_template = '''
+          SELECT from_id,
+                 to_id,
+                 mins,
+                 cost,
+                 transfers
+          FROM routes
+          WHERE from_id = "{}"
+          AND to_id = "{}";
+        '''
+        stations = [self.location.id, self.destination.id]
         stations.sort()
-        request = self.request_template.format(*stations)
+        request = request_template.format(*stations)
         c.execute(request)
         res = c.fetchone()
         if res is None:
@@ -286,10 +330,43 @@ class Transport(Event):
             self.cost = res[3]
 
     def __str__(self):
-        return "Train from {} to {}".format(self.from_station, self.to_station)
+        return "Ride {} -> {}".format(self.location, self.destination)
+
+
+def get_transport(start, end):
+    if isinstance(start, Event):
+        start = start.location
+    if isinstance(end, Event):
+        end = end.location
+
+    # For now we're only working with train stations
+    if type(start) != Station:
+        print("Bad start location")
+        print(type(start))
+        raise
+    if type(end) != Station:
+        print("Bad end location")
+        print(type(end))
+        raise
+
+    # Return nothing if the start location is the end location
+    if start.name == end.name:
+        return None
+
+    # Return a train ride
+    return TrainRide(start, end)
 
 
 class Tour(object):
+
+    category_to_verb = {
+        'food': 'Eat at',
+        'cultural': 'See',
+        'coffee': 'Grab a drink at',
+        'shopping': "Shop at",
+        'meet': "Meet at",
+        'ride': "Ride from"
+    }
 
     def __init__(self, specs):
         self.cost = 0
@@ -297,8 +374,14 @@ class Tour(object):
         self.end_time = specs.start_time
         self.events = []
         self.specs = specs
+        self.included_meals = {}
 
     def _add_event(self, event):
+        if type(event) == Activity:
+            meal = event.would_be_meal(self.end_time)
+            if meal is not False:
+                index = len(self.events)
+                self.included_meals[index] = meal
         self.cost += event.cost
         self.duration += event.duration
         self.end_time += event.duration
@@ -314,32 +397,39 @@ class Tour(object):
         if self.end_time < event.available_from:
             return False
         # Check that its available for as long as we need
-        if self.end_time + event.duration > event.available_until:
+        if (self.end_time + event.duration) > event.available_until:
             return False
+
+        # Check that this meal hasn't already been included in the tour
+        if type(event) == Activity:
+            meal = event.would_be_meal(self.end_time)
+            if meal is not False and meal in self.included_meals.values():
+                return False
 
         # Check if transport is required
         if last_event is None:
             # Add the first meet & greet
-            self._add_event(Meet(event.station))
+            self._add_event(Meet(event.location))
             # Check that this event wouldn't exceed budgets
             if self.specs.below_maximum(cost, duration):
                 self._add_event(event)
                 return True
-        elif last_event.station.name == event.station.name:
+        elif last_event.location.name == event.location.name:
             # Check that this wouldn't exceed budgets
             if self.specs.below_maximum(cost, duration):
                 self._add_event(event)
                 return True
         else:
             # Calculate the transport
-            transport = Transport(last_event, event)
-            cost += transport.cost
-            duration += transport.duration
-            # Check that this wouldn't exceed budgets
-            if self.specs.below_maximum(cost, duration):
-                self._add_event(transport)
-                self._add_event(event)
-                return True
+            transport = get_transport(last_event, event)
+            if transport is not None:
+                cost += transport.cost
+                duration += transport.duration
+                # Check that this wouldn't exceed budgets
+                if self.specs.below_maximum(cost, duration):
+                    self._add_event(transport)
+                    self._add_event(event)
+                    return True
         return False
 
     def within_spec(self):
@@ -360,14 +450,22 @@ class Tour(object):
     def print_itineary(self):
         print(" - Total cost: {}".format(cost_string(self.cost)))
         print(" - Total time: {}".format(duration_string(self.duration)))
+        print(" - Includes: {}".format(", ".join(self.included_meals.values())))
         print(" - Itineary:")
-        verb = "Meet"
         clock = self.specs.start_time
-        for event in self.events:
-            print("     {}: {}".format(clock.strftime("%H:%M"), event))
+        for index, event in enumerate(self.events):
+            title = "{}".format(event.title)
+            if index in self.included_meals.keys():
+                title = "{} at {}".format(
+                    self.included_meals[index].title(), event.title)
+            elif event.category in self.category_to_verb:
+                title = "{} {}".format(
+                    self.category_to_verb[event.category], event.title)
+
+            print("     {}: {}".format(clock.strftime("%H:%M"), title))
             clock += event.duration
         print("     {}: Finish tour at {}".format(
-            clock.strftime("%H:%M"), self.events[-1].station))
+            clock.strftime("%H:%M"), self.events[-1].location))
 
 
 def generate_event_combinations(event_list):
@@ -398,10 +496,10 @@ def build_tours(valid_tours, tour, activities, depth=0):
 
     for index in range(len(activities)):
         activities_copy = copy.copy(activities)
-        activity = activities_copy[index]
-        activities_copy.remove(activity)
+        next_activity = activities_copy[index]
+        activities_copy.remove(next_activity)
         tour_copy = copy.deepcopy(tour)
-        if tour_copy.add_activity(activity):
+        if tour_copy.add_activity(next_activity):
             if tour_copy.within_spec():
                 valid_tours.append(tour_copy)
             build_tours(valid_tours, tour_copy, activities_copy, depth)
