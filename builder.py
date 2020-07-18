@@ -272,15 +272,15 @@ class Activity(Event):
         self.available_until = available_until
         self.category = category
 
-    def would_be_meal(self, start_time):
+    def meal_category(self, time):
         if self.category == 'food':
             for meal_type in meal_times.keys():
-                if start_time > meal_times[meal_type]['start'] \
-                        and start_time < meal_times[meal_type]['end']:
+                if time > meal_times[meal_type]['start'] \
+                        and time < meal_times[meal_type]['end']:
                     return meal_type
         elif self.category == 'coffee':
-            if start_time > meal_times['coffee']['start'] \
-                    and start_time < meal_times['coffee']['end']:
+            if time > meal_times['coffee']['start'] \
+                    and time < meal_times['coffee']['end']:
                 return 'coffee'
         return False
 
@@ -378,9 +378,9 @@ class Tour(object):
 
     def _add_event(self, event):
         if type(event) == Activity:
-            meal = event.would_be_meal(self.end_time)
+            meal = event.meal_category(self.end_time)
+            index = len(self.events)
             if meal is not False:
-                index = len(self.events)
                 self.included_meals[index] = meal
         self.cost += event.cost
         self.duration += event.duration
@@ -401,9 +401,20 @@ class Tour(object):
             return False
 
         # Check that this meal hasn't already been included in the tour
+        food_categories = ['coffee', 'food']
         if type(event) == Activity:
-            meal = event.would_be_meal(self.end_time)
+            # Don't do two food activities in a row
+            if event.category in food_categories \
+                    and last_event is not None \
+                    and last_event.category in food_categories:
+                return False
+
+            # Don't have the same meal twice
+            meal = event.meal_category(self.end_time)
             if meal is not False and meal in self.included_meals.values():
+                return False
+            elif meal is False and event.category == 'coffee':
+                # It's cofee but out of hours!
                 return False
 
         # Check if transport is required
@@ -450,7 +461,7 @@ class Tour(object):
     def print_itineary(self):
         print(" - Total cost: {}".format(cost_string(self.cost)))
         print(" - Total time: {}".format(duration_string(self.duration)))
-        print(" - Includes: {}".format(", ".join(self.included_meals.values())))
+        print(" - Included meals: {}".format(", ".join(self.included_meals.values())))
         print(" - Itineary:")
         clock = self.specs.start_time
         for index, event in enumerate(self.events):
