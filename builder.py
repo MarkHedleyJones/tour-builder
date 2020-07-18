@@ -153,10 +153,6 @@ class Specifications(object):
     min_duration = None
     num_people = None
     start_time = None
-    include_breakfast = None
-    include_lunch = None
-    include_dinner = None
-    include_coffee = None
 
     def __init__(self, num_people=1, start_time=datetime.time(8, 0)):
         self.num_people = num_people
@@ -258,6 +254,15 @@ class Meet(Event):
                                    duration=datetime.timedelta(minutes=15),
                                    cost=0,
                                    category="meet")
+
+
+class Farewell(Event):
+    def __init__(self, location):
+        super(Farewell, self).__init__(title=location.name,
+                                       location=location,
+                                       duration=datetime.timedelta(),
+                                       cost=0,
+                                       category="farewell")
 
 
 class Activity(Event):
@@ -365,6 +370,7 @@ class Tour(object):
         'coffee': 'Grab a drink at',
         'shopping': "Shop at",
         'meet': "Meet at",
+        'farewell': "Farewell at",
         'ride': "Ride from"
     }
 
@@ -464,7 +470,7 @@ class Tour(object):
         print(" - Included meals: {}".format(", ".join(self.included_meals.values())))
         print(" - Itineary:")
         clock = self.specs.start_time
-        for index, event in enumerate(self.events):
+        for index, event in enumerate(self.events + [Farewell(self.events[-1].location)]):
             title = "{}".format(event.title)
             if index in self.included_meals.keys():
                 title = "{} at {}".format(
@@ -473,10 +479,9 @@ class Tour(object):
                 title = "{} {}".format(
                     self.category_to_verb[event.category], event.title)
 
-            print("     {}: {}".format(clock.strftime("%H:%M"), title))
+            print("     {}: {}".format(clock.strftime("%H:%M"),
+                                       title))
             clock += event.duration
-        print("     {}: Finish tour at {}".format(
-            clock.strftime("%H:%M"), self.events[-1].location))
 
 
 def generate_event_combinations(event_list):
