@@ -9,6 +9,15 @@ import os
 import sqlite3
 import time
 
+
+# TODO:
+# - Make meet and farewel say ... Station
+# - Ensure there is a meal/coffee at least once every x hours
+# - Add an included categories field
+# - Add required meal categories field to specifications
+# - Add required attraction categories field to specifications
+# - Dont travel for more than x minutes to get coffee
+
 path_transit_database = "tokyo-transit.db"
 path_activities = "activities.csv"
 
@@ -371,7 +380,7 @@ class Tour(object):
         'shopping': "Shop at",
         'meet': "Meet at",
         'farewell': "Farewell at",
-        'ride': "Ride from"
+        'ride': ""
     }
 
     def __init__(self, specs):
@@ -478,9 +487,12 @@ class Tour(object):
             elif event.category in self.category_to_verb:
                 title = "{} {}".format(
                     self.category_to_verb[event.category], event.title)
-
-            print("     {}: {}".format(clock.strftime("%H:%M"),
-                                       title))
+            if type(event) is TrainRide:
+                print("     {:>100}: {}".format(
+                    title, clock.strftime("%H:%M")))
+            else:
+                print("     {}: {}".format(clock.strftime("%H:%M"),
+                                           title))
             clock += event.duration
 
 
