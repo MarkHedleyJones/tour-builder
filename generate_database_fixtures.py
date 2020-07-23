@@ -230,10 +230,10 @@ def main():
     activities_fixtures = gen_activities_fixtures(app_name)
 
     out = []
-    out += station_fixtures
-    out += transport_fixtures
-    # out += activitytype_fixtures
-    # out += activities_fixtures
+    # out += station_fixtures
+    # out += transport_fixtures
+    out += activitytype_fixtures
+    out += activities_fixtures
 
     write_json(path_fixtures, out)
 
