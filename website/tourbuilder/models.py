@@ -48,3 +48,12 @@ class TrainRide(models.Model):
 
     def __str__(self):
         return "{} to {}".format(self.from_station.name, self.to_station.name)
+
+
+class Tour(models.Model):
+    cost = models.PositiveIntegerField()
+    duration = models.DurationField()
+    available_from = models.TimeField()
+    available_until = models.TimeField()
+    activities = models.ManyToManyField(Activity)
+    trainRides = models.ManyToManyField(TrainRide)
