@@ -504,15 +504,6 @@ def generate_event_combinations(event_list):
     return combos
 
 
-activities = load_activities(path_activities)
-
-# Setup tour specifications
-specs = Specifications(num_people=1, start_time=datetime.time(8, 0))
-specs.set_max_cost(100000)
-specs.set_min_end_time(datetime.time(16, 0))
-specs.set_max_end_time(datetime.time(17, 0))
-
-
 def build_tours(valid_tours, tour, activities, depth=0):
     depth += 1
 
@@ -533,16 +524,25 @@ def build_tours(valid_tours, tour, activities, depth=0):
             build_tours(valid_tours, tour_copy, activities_copy, depth)
 
 
-tours = []
+if __name__ == "__main__":
+    activities = load_activities(path_activities)
 
-for index in range(len(activities)):
-    activity_list = copy.copy(activities)
-    tour = Tour(specs)
-    if tour.add_activity(activity_list.pop(index)):
-        build_tours(tours, tour, activity_list)
+    # Setup tour specifications
+    specs = Specifications(num_people=1, start_time=datetime.time(8, 0))
+    specs.set_max_cost(100000)
+    specs.set_min_end_time(datetime.time(16, 0))
+    specs.set_max_end_time(datetime.time(17, 0))
 
-for tour_number, tour in enumerate(tours):
-    print("Tour Idea {}:".format(tour_number))
-    tour.print_itineary()
-    print("")
-("")
+    tours = []
+
+    for index in range(len(activities)):
+        activity_list = copy.copy(activities)
+        tour = Tour(specs)
+        if tour.add_activity(activity_list.pop(index)):
+            build_tours(tours, tour, activity_list)
+
+    for tour_number, tour in enumerate(tours):
+        print("Tour Idea {}:".format(tour_number))
+        tour.print_itineary()
+        print("")
+    ("")
