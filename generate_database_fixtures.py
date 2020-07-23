@@ -18,7 +18,7 @@ c = conn.cursor()
 
 station_id_pks = {}
 station_name_pks = {}
-activity_type_pks = {}
+category_pks = {}
 
 
 def write_json(path, data):
@@ -155,7 +155,7 @@ def gen_transport_fixtures(basename):
 
 
 def gen_category_fixtures(basename):
-    global activity_type_pks
+    global category_pks
     # Can this be turned into an enumeration (would that be better)?
     categories = [
         ('food', 'Anywhere you can eat (except maid, cat, robot restaurants)'),
@@ -181,12 +181,12 @@ def gen_category_fixtures(basename):
                 'description': category[1]
             }
         })
-        activity_type_pks[category[0]] = pk
+        category_pks[category[0]] = pk
     return out
 
 
 def gen_activities_fixtures(basename):
-    global activity_type_pks, station_name_pks
+    global category_pks, station_name_pks
 
     activities = load_activities(path_activities)
     out = []
@@ -204,7 +204,7 @@ def gen_activities_fixtures(basename):
         if activity['closes'] != "":
             available_until = "{}:00".format(activity['closes'])
 
-        activity_type = activity_type_pks[activity['category']]
+        category = category_pks[activity['category']]
         train_station = station_name_pks[activity['station']]
         out.append({
             'model': "{}.activity".format(basename),
@@ -215,7 +215,7 @@ def gen_activities_fixtures(basename):
                 'cost': cost,
                 'available_from': available_from,
                 'available_until': available_until,
-                'activity_type': activity_type,
+                'category': category,
                 'train_station': train_station
             }
         })
@@ -230,10 +230,10 @@ def main():
     activities_fixtures = gen_activities_fixtures(app_name)
 
     out = []
-    out += station_fixtures
-    out += transport_fixtures
-    # out += category_fixtures
-    # out += activities_fixtures
+    # out += station_fixtures
+    # out += transport_fixtures
+    out += category_fixtures
+    out += activities_fixtures
 
     write_json(path_fixtures, out)
 
