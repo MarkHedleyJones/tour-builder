@@ -18,13 +18,13 @@ class ActivityType(models.Model):
         return self.title
 
 
-class TrainStation(Location):
+class Station(Location):
     station_id = models.IntegerField(unique=True)
 
 
 class Activity(models.Model):
     activity_type = models.ForeignKey(ActivityType, on_delete=models.CASCADE)
-    train_station = models.ForeignKey(TrainStation, on_delete=models.CASCADE)
+    train_station = models.ForeignKey(Station, on_delete=models.CASCADE)
     available_from = models.TimeField()
     available_until = models.TimeField()
     cost = models.PositiveIntegerField()
@@ -36,10 +36,10 @@ class Activity(models.Model):
 
 
 class TrainRide(models.Model):
-    from_station = models.ForeignKey(TrainStation,
+    from_station = models.ForeignKey(Station,
                                      related_name='from_station',
                                      on_delete=models.CASCADE)
-    to_station = models.ForeignKey(TrainStation,
+    to_station = models.ForeignKey(Station,
                                    related_name='to_station',
                                    on_delete=models.CASCADE)
     duration = models.DurationField()

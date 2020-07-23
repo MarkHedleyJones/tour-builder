@@ -85,7 +85,7 @@ def gen_station_fixtures(basename):
             print(result)
             continue
         out.append({
-            'model': "{}.trainstation".format(basename),
+            'model': "{}.station".format(basename),
             'pk': pk,
             'fields': {
                 'station_id': station_id
@@ -230,10 +230,10 @@ def main():
     activities_fixtures = gen_activities_fixtures(app_name)
 
     out = []
-    # out += station_fixtures
-    # out += transport_fixtures
-    out += activitytype_fixtures
-    out += activities_fixtures
+    out += station_fixtures
+    out += transport_fixtures
+    # out += activitytype_fixtures
+    # out += activities_fixtures
 
     write_json(path_fixtures, out)
 
