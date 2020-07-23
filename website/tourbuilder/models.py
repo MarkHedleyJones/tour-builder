@@ -10,7 +10,7 @@ class Location(models.Model):
         return self.name
 
 
-class ActivityType(models.Model):
+class Category(models.Model):
     title = models.CharField(max_length=50)
     description = models.CharField(max_length=200)
 
@@ -23,7 +23,7 @@ class Station(Location):
 
 
 class Activity(models.Model):
-    activity_type = models.ForeignKey(ActivityType, on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
     train_station = models.ForeignKey(Station, on_delete=models.CASCADE)
     available_from = models.TimeField()
     available_until = models.TimeField()

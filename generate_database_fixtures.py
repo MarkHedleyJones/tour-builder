@@ -154,7 +154,7 @@ def gen_transport_fixtures(basename):
     return out
 
 
-def gen_activitytype_fixtures(basename):
+def gen_category_fixtures(basename):
     global activity_type_pks
     # Can this be turned into an enumeration (would that be better)?
     categories = [
@@ -174,7 +174,7 @@ def gen_activitytype_fixtures(basename):
     for index, category in enumerate(categories):
         pk = index + 1
         out.append({
-            'model': "{}.activitytype".format(basename),
+            'model': "{}.category".format(basename),
             'pk': pk,
             'fields': {
                 'title': category[0],
@@ -226,14 +226,14 @@ def main():
     app_name = 'tourbuilder'
     station_fixtures = gen_station_fixtures(app_name)
     transport_fixtures = gen_transport_fixtures(app_name)
-    activitytype_fixtures = gen_activitytype_fixtures(app_name)
+    category_fixtures = gen_category_fixtures(app_name)
     activities_fixtures = gen_activities_fixtures(app_name)
 
     out = []
-    # out += station_fixtures
-    # out += transport_fixtures
-    out += activitytype_fixtures
-    out += activities_fixtures
+    out += station_fixtures
+    out += transport_fixtures
+    # out += category_fixtures
+    # out += activities_fixtures
 
     write_json(path_fixtures, out)
 
