@@ -16,6 +16,7 @@ path_transit_database = "tokyo-transit.db"
 conn = sqlite3.connect(path_transit_database)
 c = conn.cursor()
 
+ref_date_str = "1970-01-01"
 station_id_pks = {}
 station_name_pks = {}
 category_pks = {}
@@ -117,7 +118,8 @@ def gen_transport_fixtures(basename):
     results = c.fetchall()
     out = []
     for index, result in enumerate(results):
-        pk = index + 1
+        pk = (index * 2) # RESUME Make sure you're not adding duplicate pks!
+        # pk = index + 1
         if int(result[0]) not in station_id_pks or int(result[1]) not in station_id_pks:
             print("Error: Can't find the station for this trip!")
             print(result)
@@ -142,7 +144,7 @@ def gen_transport_fixtures(basename):
         })
         out.append({
             'model': "{}.trainride".format(basename),
-            'pk': pk,
+            'pk': pk + 1,
             'fields': {
                 'from_station': to_station_pk,
                 'to_station': from_station_pk,
@@ -167,7 +169,7 @@ def gen_category_fixtures(basename):
         ('shopping', 'Shopping centres'),
         ('museum', 'Any type of museum'),
         ('zoo', 'Any type of animal park'),
-        ('theme-food', "E.g. maid-cafe, cat-cafe, robot-restaurant etc."),
+        ('theme-food', "e.g. maid-cafe, cat-cafe, robot-restaurant etc."),
         ('theme-park', 'e.g. fujiQ highland, universial studios'),
     ]
     out = []
@@ -196,13 +198,16 @@ def gen_activities_fixtures(basename):
         duration = str(datetime.timedelta(hours=float(activity['duration'])))
         cost = int(activity['cost'])
 
-        available_from = "00:00:00"
+        available_from = "{} 00:00:00".format(ref_date_str)
         if activity['opens'] != "":
-            available_from = "{}:00".format(activity['opens'])
+            available_from = "{} {}:00".format(ref_date_str, activity['opens'])
 
-        available_until = "23:59:59"
+        available_until = "{} 23:59:59".format(ref_date_str)
         if activity['closes'] != "":
-            available_until = "{}:00".format(activity['closes'])
+            available_until = "{} {}:00".format(ref_date_str, activity['closes'])
+
+        available_from += "+09:00"
+        available_until += "+09:00"
 
         category = category_pks[activity['category']]
         train_station = station_name_pks[activity['station']]
@@ -230,8 +235,8 @@ def main():
     activities_fixtures = gen_activities_fixtures(app_name)
 
     out = []
-    # out += station_fixtures
-    # out += transport_fixtures
+    out += station_fixtures
+    out += transport_fixtures
     out += category_fixtures
     out += activities_fixtures
 
