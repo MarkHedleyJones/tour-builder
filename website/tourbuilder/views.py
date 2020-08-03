@@ -2,11 +2,12 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 # from django.template import loader
 
-from .models import Activity, Location, Station
+from .models import Activity, Location, Station, Tour
 
 
 def index(request):
-    return HttpResponse("Hello, world. You're at the polls index.")
+    tours = Tour.objects.all()
+    return render(request, 'tourbuilder/index.html', {'tours': tours})
 
 
 def activity(request, activity_id):
