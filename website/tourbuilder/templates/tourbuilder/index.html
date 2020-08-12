@@ -13,6 +13,53 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.blue-amber.min.css" />
     <link rel="stylesheet" href="{% static "tourbuilder/styles.css" %}">
+    <style>
+    h4 {
+      color: #202124;
+      font: 400 20px/24px "Google Sans", Roboto, HelveticaNeue, Arial, sans-serif;
+    }
+    .main {
+      min-width: 1008px;
+    }
+    .main ol {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      display: block;
+      list-style-type: none;
+    }
+
+    .tour-results li {
+      position: relative;
+      display: flex;
+    }
+
+    .tour-result-card {
+      display: block;
+      padding: 10px;
+      border-radius: 0;
+      border-color: #dadce0;
+      border: 1px solid #dadce0;
+    }
+
+    .tour-results .tour-result-card {
+      border: 0px solid #dadce0;
+      border-bottom-width: 1px;
+      border-left-width: 1px;
+      border-right-width: 1px;
+      /*box-shadow: 0 1px 2px rgba(60,64,67, 0.3), 0 1px 3px 1px rgba(60,64,67, 0.15);*/
+    }
+
+    .tour-results:first-child .tour-result-card {
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+      border-top-width: 1px;
+    }
+    .tour-results:last-child .tour-result-card {
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+    }
+    </style>
   </head>
   <body>
     <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
@@ -38,27 +85,33 @@
           <a class="mdl-navigation__link" href="">Link</a>
         </nav>
       </div>
-      <main class="mdl-layout__content">
-        <div class="page-content">
-          <ul>
+      <main class="page-content mdl-grid">
+        <div class="main">
+          <h4>
+            <span>Recommended tours</span>
+          </h4>
+          <ol>
           {% for tour in tours %}
-            <li class="mdl-list__item mdl-list__item--three-line">
-              <span class="mdl-list__item-primary-content">
-                <i class="material-icons mdl-list__item-avatar">stop_circle</i>
-                <span>A ¥{{ tour.cost }} tour lasting {{ tour.duration.seconds }} seconds</span>
-                <span class="mdl-list__item-text-body">
-                  During this tour you will visit:
-                  {% for activity in tour.activities.all %}
-                    {{ activity.title }}
-                  {% endfor %}
+            <li class="tour-results">
+              <div class="tour-result-card">
+                <span class="mdl-list__item-primary-content">
+                  <i class="material-icons mdl-list__item-avatar">stop_circle</i>
+                  <span>A ¥{{ tour.cost }} tour lasting {{ tour.duration.seconds }} seconds</span>
+                  <span class="mdl-list__item-text-body">
+                    During this tour you will visit:
+                    {% for activity in tour.activities.all %}
+                      {{ activity.title }}
+                    {% endfor %}
+                  </span>
                 </span>
-              </span>
-              <span class="mdl-list__item-secondary-content">
-                <a class="mdl-list__item-secondary-action" href="#"><i class="material-icons">star</i></a>
-              </span>
+                <span class="mdl-list__item-secondary-content">
+                  <a class="mdl-list__item-secondary-action" href="#"><i class="material-icons">star</i></a>
+                </span>
+              </div>
             </li>
           {% endfor %}
-          </ul>
+          </ol>
+
         </div>
       </main>
       <footer class="mdl-mini-footer">
