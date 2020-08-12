@@ -1,12 +1,17 @@
 {% extends 'tourbuilder/base.html' %}
 {% block title %}Tour{% endblock %}
 {% block content %}
-  <ul>
-  <li>{{ tour.activities }}</li>
-  <li>{{ tour.available_from }}</li>
-  <li>{{ tour.available_until }}</li>
-  <li>{{ tour.cost }}</li>
-  <li>{{ tour.duration }}</li>
-  <li>{{ tour.train_rides }}</li>
+<h2>Activities</h2>
+<ul>
+{% for activity in tour.activities.all %}
+  <li><a href="/activity/{{ activity.id }}">{{ activity.title }}</a></li>
+{% endfor %}
+</ul>
+<h2>Overview</h3>
+<ul>
+  <li>Earliest start time: {{ tour.available_from.time }}</li>
+  <li>Latest start time: {{ tour.available_until.time }}</li>
+  <li>Total cost: {{ tour.cost }}</li>
+  <li>Total duration: {{ tour.duration }}</li>
 </ul>
 {% endblock %}

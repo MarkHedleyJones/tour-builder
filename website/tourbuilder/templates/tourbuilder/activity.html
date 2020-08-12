@@ -1,9 +1,13 @@
-<h1>{{ activity.title }}</h1>
+{% extends 'tourbuilder/base.html' %}
+{% block title %}{{  activity.title }}{% endblock %}
+{% block content %}
+<h2>{{ activity.title}} </h2>
 <ul>
-  <li>{{ activity.activity_type }}</li>
+<!--   <li>{{ activity.activity_type }}</li> -->
   <li>{{ activity.train_station }}</li>
-  <li>{{ activity.available_from }}</li>
-  <li>{{ activity.available_until }}</li>
+  <li>{{ activity.available_from.time }}</li>
+  <li>{{ activity.available_until.time }}</li>
   <li>{{ activity.cost }}</li>
   <li>{{ activity.duration }}</li>
 </ul>
+{% endblock %}
