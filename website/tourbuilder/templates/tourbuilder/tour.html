@@ -1,0 +1,12 @@
+{% extends 'tourbuilder/base.html' %}
+{% block title %}Tour{% endblock %}
+{% block content %}
+  <ul>
+  <li>{{ tour.activities }}</li>
+  <li>{{ tour.available_from }}</li>
+  <li>{{ tour.available_until }}</li>
+  <li>{{ tour.cost }}</li>
+  <li>{{ tour.duration }}</li>
+  <li>{{ tour.train_rides }}</li>
+</ul>
+{% endblock %}

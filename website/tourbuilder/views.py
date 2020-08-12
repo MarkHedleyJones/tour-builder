@@ -10,6 +10,11 @@ def index(request):
     return render(request, 'tourbuilder/index.html', {'tours': tours})
 
 
+def tour(request, tour_id):
+    tour = get_object_or_404(Tour, pk=tour_id)
+    return render(request, 'tourbuilder/tour.html', {'tour': tour})
+
+
 def activity(request, activity_id):
     activity = get_object_or_404(Activity, pk=activity_id)
     return render(request, 'tourbuilder/activity.html', {'activity': activity})
