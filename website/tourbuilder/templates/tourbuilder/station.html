@@ -1,4 +1,8 @@
-<h1>{{ station.name }}</h1>
+{% extends 'tourbuilder/base.html' %}
+{% block title %}{{ station.name }} Station{% endblock %}
+{% block content %}
+<h2>{{ station.name }} Station</h2>
 <ul>
-  <li>{{ station.station_id }}</li>
+  <li>Station: {{ station.id}}</li>
 </ul>
+{% endblock %}

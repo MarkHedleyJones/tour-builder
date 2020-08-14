@@ -4,7 +4,7 @@
 <h2>{{ activity.title}} </h2>
 <ul>
 <!--   <li>{{ activity.activity_type }}</li> -->
-  <li>{{ activity.train_station }}</li>
+  <li><a href="/station/{{ activity.train_station.id }}">{{ activity.train_station }} Station</a></li>
   <li>{{ activity.available_from.time }}</li>
   <li>{{ activity.available_until.time }}</li>
   <li>{{ activity.cost }}</li>
