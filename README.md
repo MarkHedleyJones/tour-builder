@@ -7,7 +7,7 @@
  - ~~Update .gitignore to ignore non-important changes~~
  - ~~Enable station details page from activities page~~
  - ~~Fix footer position~~
- - Fix link colours
+ - ~~Fix link colours~~
  - Add map view to activity page
  - Add map view to station page
  - Add basic tour filtering
